@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>غير متصل - نظام إدارة الشفتات</title>
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Tajawal', sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; background: #f0f4f8; color: #1e293b; }
+    .offline-card { background: white; border-radius: 20px; padding: 48px 40px; max-width: 400px; text-align: center; box-shadow: 0 24px 64px rgba(0,0,0,0.1); }
+    .offline-icon { font-size: 64px; margin-bottom: 20px; }
+    h1 { font-size: 22px; font-weight: 800; color: #1a3a5c; margin-bottom: 12px; }
+    p { color: #64748b; font-size: 14px; line-height: 1.6; margin-bottom: 24px; }
+    .btn { display: inline-block; padding: 12px 32px; background: #0d9488; color: white; border: none; border-radius: 8px; font-family: 'Tajawal', sans-serif; font-size: 15px; font-weight: 700; cursor: pointer; transition: background 0.2s; }
+    .btn:hover { background: #0f766e; }
+  </style>
+</head>
+<body>
+  <div class="offline-card">
+    <div class="offline-icon">📡</div>
+    <h1>لا يوجد اتصال بالإنترنت</h1>
+    <p>يبدو أنك غير متصل بالإنترنت. تأكد من اتصالك بالشبكة وأعد المحاولة.</p>
+    <button class="btn" onclick="location.reload()">🔄 إعادة المحاولة</button>
+  </div>
+</body>
+</html>

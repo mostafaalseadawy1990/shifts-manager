@@ -1,0 +1,20 @@
+{
+  "name": "نظام إدارة الشفتات السحابي",
+  "short_name": "نظام الشفتات",
+  "description": "نظام سحابي متكامل لإدارة شفتات العمل والإجازات والأذونات",
+  "start_url": "HRM-shifts-system.html",
+  "display": "standalone",
+  "background_color": "#f0f4f8",
+  "theme_color": "#1a3a5c",
+  "orientation": "portrait-primary",
+  "dir": "rtl",
+  "lang": "ar",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
