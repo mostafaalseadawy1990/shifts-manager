@@ -11,7 +11,7 @@ function toggleDarkMode() {
 (function() { if (localStorage.getItem('darkMode') === '1') { document.body.classList.add('dark'); setTimeout(() => { const btn = document.getElementById('darkModeToggle'); if (btn) btn.textContent = '☀️ الوضع النهاري'; }, 100); } })();
 
 // ===== State =====
-const CLOUD_URL = "https://script.google.com/macros/s/AKfycbxtTFdfY73TP61WmM0S0rPqCb6g7GWWp-b082cdM65G91WwbdFCQBisCv-HJizmSsj3/exec";
+const CLOUD_URL = "https://script.google.com/macros/s/AKfycbx2TTTdouTPXUX7vn5jmCZ8RaMaNbXSdTaDyh0Y4amd3x7ktl_rKqdoi-X9VQblAl5A/exec";
 let DATABASE = { branches: [], employees: [], shifts: [], shiftTypes: [], leaves: [], leaveTypes: [], leaveBalances: [], settings: [], attendance: [] };
 let currentRole = null, currentBranch = null, loginType = 'branch', branchStatusFilter = '', tempCellData = null;
 let _sortState = {};
