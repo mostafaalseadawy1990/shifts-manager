@@ -11,7 +11,7 @@ function toggleDarkMode() {
 (function() { if (localStorage.getItem('darkMode') === '1') { document.body.classList.add('dark'); setTimeout(() => { const btn = document.getElementById('darkModeToggle'); if (btn) btn.textContent = '☀️ الوضع النهاري'; }, 100); } })();
 
 // ===== State =====
-const CLOUD_URL = "https://script.google.com/macros/s/AKfycbwsg3LVCBMI5QxIBpf2LfKoigMAxOrH_sAU4_NuESOPQsXQEpvKC5qyV6DspGJObwww/exec";
+const CLOUD_URL = "https://script.google.com/macros/s/AKfycbxtTFdfY73TP61WmM0S0rPqCb6g7GWWp-b082cdM65G91WwbdFCQBisCv-HJizmSsj3/exec";
 let DATABASE = { branches: [], employees: [], shifts: [], shiftTypes: [], leaves: [], leaveTypes: [], leaveBalances: [], settings: [], attendance: [] };
 let currentRole = null, currentBranch = null, loginType = 'branch', branchStatusFilter = '', tempCellData = null;
 let _sortState = {};
@@ -332,6 +332,11 @@ async function bulkApprove(type) {
   const toUpdate = items.map(cb => ({ ...db.find(x => String(x.id) === String(cb.value)), status: 'Approved' })).filter(x => x.status);
   if (!toUpdate.length) return showToast('كلهم معتمدون', 'warning');
   if (await cloudAction(type === 'shift' ? 'Shifts' : (type === 'attendance' ? 'Attendance' : 'Leaves'), 'bulk_save', toUpdate)) {
+    if (type === 'leave') {
+      const affectedEmps = [...new Set(toUpdate.map(l => l.empId))];
+      const affectedTypes = [...new Set(toUpdate.map(l => l.type))];
+      for (const empId of affectedEmps) for (const lt of affectedTypes) await recalcLeaveBalance(empId, lt);
+    }
     showToast('تم الاعتماد', 'success');
   }
 }
@@ -518,6 +523,7 @@ function openLeaveModal(id = null) {
       document.getElementById('leaveEmployee').value = lv.empId; document.getElementById('leaveDate').value = lv.date;
       document.getElementById('leaveEndDateGroup').style.display = 'none';
       document.getElementById('leaveType').value = lv.type; document.getElementById('leaveQuantity').value = lv.quantity || ''; document.getElementById('leaveNotes').value = lv.notes;
+      updateLeaveBalancePreview();
     }, 50);
     const locked = currentRole === 'branch' && lv.status !== 'Pending';
     document.getElementById('btnDelLeave').style.display = locked ? 'none' : 'inline-flex';
@@ -531,6 +537,7 @@ function openLeaveModal(id = null) {
     if (currentRole !== 'branch') document.getElementById('leaveStatusModal').value = 'Pending';
     document.getElementById('btnDelLeave').style.display = 'none';
     btnSave.style.display = 'inline-flex';
+    setTimeout(() => updateLeaveBalancePreview(), 100);
   }
   openModal('leaveModal');
 }
@@ -540,6 +547,11 @@ async function saveLeave() {
   const startDate = document.getElementById('leaveDate').value, endDate = document.getElementById('leaveEndDate').value || startDate;
   const typeVal = document.getElementById('leaveType').value, quantityVal = document.getElementById('leaveQuantity').value, notes = document.getElementById('leaveNotes').value;
   if (!empId || !startDate || !typeVal || !quantityVal) return showToast('أكمل الحقول', 'error');
+  if (typeVal !== 'أعياد') {
+    const days = Math.round((new Date(endDate) - new Date(startDate)) / 86400000) + 1;
+    const bal = getLeaveBalance(empId, typeVal);
+    if (bal.remaining < days) return showToast(`الرصيد المتبقي (${bal.remaining}) أقل من المطلوب (${days})`, 'error');
+  }
   const emp = DATABASE.employees.find(e => String(e.id) === String(empId));
   const editId = document.getElementById('leaveEditId').value;
   const statusVal = currentRole === 'branch' ? (editId ? DATABASE.leaves.find(s=>s.id===editId)?.status || 'Pending' : 'Pending') : document.getElementById('leaveStatusModal').value;
@@ -1323,6 +1335,30 @@ function renderReport() {
     return;
   }
 
+  if (rType === 'leave-balances') {
+    const year = new Date().getFullYear();
+    let emps = DATABASE.employees.filter(e => e.status === 'active');
+    if (bId) emps = emps.filter(e => String(e.branchId) === String(bId));
+    if (nameF) emps = emps.filter(e => (e.name||'').toLowerCase().includes(nameF));
+    if (posF) emps = emps.filter(e => (pMap[e.id]||'').toLowerCase().includes(posF));
+    let html = `<table><thead><tr><th>الموظف</th><th>الوظيفة</th><th>الفرع</th><th>نوع الإجازة</th><th>الافتتاحي</th><th>المستهلك</th><th>المتبقي</th></tr></thead><tbody>`;
+    if (!emps.length) html += '<tr><td colspan="7" style="text-align:center">لا يوجد موظفون</td></tr>';
+    else {
+      const leaveTypeNames = DATABASE.leaveTypes.map(t => t.name);
+      emps.forEach(emp => {
+        leaveTypeNames.forEach(ltName => {
+          if (ltName === 'أعياد') return;
+          const bal = getLeaveBalance(emp.id, ltName);
+          if (bal.opening === 0 && bal.consumed === 0) return;
+          const remColor = bal.remaining > 0 ? 'var(--success)' : 'var(--danger)';
+          html += `<tr><td data-label="الموظف"><strong>${escapeHtml(emp.name)}</strong><br><span style="font-size:10px;color:#888">${emp.id}</span></td><td data-label="الوظيفة">${emp.position||'-'}</td><td data-label="الفرع">${bMap[emp.branchId]||emp.branchId}</td><td data-label="النوع">${ltName}</td><td data-label="الافتتاحي" style="font-weight:600">${bal.opening}</td><td data-label="المستهلك" style="font-weight:600">${bal.consumed}</td><td data-label="المتبقي" style="font-weight:700;color:${remColor}">${bal.remaining}</td></tr>`;
+        });
+      });
+    }
+    document.getElementById('reportContainer').innerHTML = html + '</tbody></table>';
+    return;
+  }
+
   let list = (rType === 'shifts' ? DATABASE.shifts : DATABASE.leaves).filter(x => x.status === 'Approved');
   if (bId) list = list.filter(x => String(x.branchId) === String(bId));
   if (dStart) list = list.filter(x => x.date >= dStart);
@@ -1348,6 +1384,7 @@ function renderSettings() {
   const ruleEnd = document.getElementById('ruleCheckInEnd');
   if (ruleStart) ruleStart.value = rules.start;
   if (ruleEnd) ruleEnd.value = rules.end;
+  loadLeaveSettings();
 }
 function openBranchModal(id = null) {
   if (currentRole !== 'admin') return showToast('غير مسموح', 'error');
@@ -1444,7 +1481,13 @@ document.getElementById('confirmBtn').onclick = async () => {
   if (isBulk) {
     if (await cloudAction(tMap[type]||type+'s', 'bulk_delete', { ids })) {
       if (type === 'shift') DATABASE.shifts = DATABASE.shifts.filter(s => !ids.includes(String(s.id)));
-      else if (type === 'leave') DATABASE.leaves = DATABASE.leaves.filter(s => !ids.includes(String(s.id)));
+      else if (type === 'leave') {
+        const deletedLeaves = DATABASE.leaves.filter(s => ids.includes(String(s.id)));
+        DATABASE.leaves = DATABASE.leaves.filter(s => !ids.includes(String(s.id)));
+        const affectedEmps = [...new Set(deletedLeaves.map(l => l.empId))];
+        const affectedTypes = [...new Set(deletedLeaves.map(l => l.type))];
+        for (const empId of affectedEmps) for (const lt of affectedTypes) await recalcLeaveBalance(empId, lt);
+      }
       else if (type === 'attendance') DATABASE.attendance = DATABASE.attendance.filter(a => !ids.includes(String(a.id)));
       showToast('تم الحذف', 'warning');
     }
@@ -1452,7 +1495,11 @@ document.getElementById('confirmBtn').onclick = async () => {
     const id = ids[0];
     if (await cloudAction(tMap[type]||type+'s', 'delete', { id })) {
       if (type === 'shift') DATABASE.shifts = DATABASE.shifts.filter(s => String(s.id) !== String(id));
-      else if (type === 'leave') DATABASE.leaves = DATABASE.leaves.filter(s => String(s.id) !== String(id));
+      else if (type === 'leave') {
+        const lv = DATABASE.leaves.find(s => String(s.id) === String(id));
+        DATABASE.leaves = DATABASE.leaves.filter(s => String(s.id) !== String(id));
+        if (lv) await recalcLeaveBalance(lv.empId, lv.type);
+      }
       else if (type === 'attendance') DATABASE.attendance = DATABASE.attendance.filter(a => String(a.id) !== String(id));
       else if (type === 'employee') DATABASE.employees = DATABASE.employees.filter(s => String(s.id) !== String(id));
       showToast('تم الحذف', 'warning');
@@ -1672,11 +1719,12 @@ document.addEventListener('keydown', function(e) {
 function quickChangeStatus(id, newStatus, type) {
   if (currentRole === 'branch') return showToast('غير مسموح', 'error');
   const table = type === 'shift' ? 'Shifts' : type === 'leave' ? 'Leaves' : 'Attendance';
-  cloudAction(table, 'save', { id, status: newStatus }).then(ok => {
+  cloudAction(table, 'save', { id, status: newStatus }).then(async ok => {
     if (ok) {
       const list = type === 'shift' ? DATABASE.shifts : type === 'leave' ? DATABASE.leaves : DATABASE.attendance;
       const item = list.find(x => String(x.id) === String(id));
       if (item) item.status = newStatus;
+      if (type === 'leave' && item) await recalcLeaveBalance(item.empId, item.type);
       refreshActivePage();
       showToast('تم التحديث', 'success');
     }

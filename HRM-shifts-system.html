@@ -694,7 +694,7 @@ window.jspdf = null;
         <div class="card">
           <div class="card-header">
             <div class="filter-bar" style="width:100%">
-              <select id="reportType" onchange="renderReport()"><option value="shifts">تقرير الشفتات</option><option value="shifts-format">تقرير شفتات (شكل الجدول)</option><option value="leaves">تقرير الإجراءات</option><option value="attendance">تقرير الحضور</option></select>
+              <select id="reportType" onchange="renderReport()"><option value="shifts">تقرير الشفتات</option><option value="shifts-format">تقرير شفتات (شكل الجدول)</option><option value="leaves">تقرير الإجراءات</option><option value="leave-balances">تقرير أرصدة الإجازات</option><option value="attendance">تقرير الحضور</option></select>
               <input type="date" id="reportStart" onchange="renderReport()"> الى <input type="date" id="reportEnd" onchange="renderReport()">
               <input type="text" id="reportName" placeholder="بحث بالاسم..." oninput="renderReport()">
               <input type="text" id="reportPos" placeholder="بحث بالوظيفة..." oninput="renderReport()">
@@ -971,7 +971,7 @@ window.jspdf = null;
     <div class="modal-body">
       <input type="hidden" id="leaveEditId">
       <div class="form-group mb-16 admin-only" style="display:none"><label>اختر الفرع *</label><select id="leaveBranch" onchange="populateModalEmployees('leave')"></select></div>
-      <div class="form-group mb-16"><label>الموظف *</label><select id="leaveEmployee"></select></div>
+      <div class="form-group mb-16"><label>الموظف *</label><select id="leaveEmployee" onchange="updateLeaveBalancePreview()"></select></div>
       
       <div class="form-row mb-16">
         <div class="form-group"><label>من تاريخ *</label><input type="date" id="leaveDate"></div>
