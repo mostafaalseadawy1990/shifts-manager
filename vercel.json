@@ -1,0 +1,6 @@
+{
+  "rewrites": [
+    { "source": "/", "destination": "/HRM-shifts-system.html" },
+    { "source": "/(.*)", "destination": "/HRM-shifts-system.html" }
+  ]
+}
