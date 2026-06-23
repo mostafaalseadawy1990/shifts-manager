@@ -831,7 +831,7 @@ function renderList(tableId, dbArray, branchId, dateStartId, dateEndId, statusId
       btns = '<span style="color:#888;font-size:11px">مغلق</span>';
     }
 
-    allRows.push(`<tr>${isAdmin ? `<td data-label="تحديد"><input type="checkbox" class="${cbKey} custom-checkbox" value="${item.id}"></td><td data-label="الفرع" title="${bMap[item.branchId]||item.branchId}"><strong>${bMap[item.branchId]||item.branchId}</strong></td>` : ''}<td data-label="الموظف" title="${escapeHtml(item.empName)} (${item.empId})"><strong>${escapeHtml(item.empName)}</strong><br><span style="font-size:10px;color:#888">${item.empId}</span></td><td data-label="الوظيفة" title="${posMap[item.empId]||''}" style="color:#666;font-size:11px">${posMap[item.empId]||'-'}</td>${isAtt ? (() => {
+    allRows.push(`<tr>${isAdmin ? `<td data-label="تحديد"><input type="checkbox" class="${cbKey} custom-checkbox" value="${item.id}"></td><td data-label="الفرع" title="${bMap[item.branchId]||item.branchId}"><strong>${bMap[item.branchId]||item.branchId}</strong></td>` : ''}<td data-label="الموظف" title="${escapeHtml(item.empName)} (${item.empId})"><strong style="font-size:13px">${escapeHtml(item.empName)}</strong><br><span style="font-size:11px;color:#666;font-weight:500">${posMap[item.empId]||''}</span><br><span style="font-size:10px;color:#888">${item.empId}</span></td>${isAtt ? (() => {
       const stObj = DATABASE.shiftTypes.find(t => t.name === item.shiftType);
       const shS = stObj ? stObj.startTime : item.shiftStart;
       const shE = stObj ? stObj.endTime : item.shiftEnd;
@@ -2244,26 +2244,27 @@ function renderReview() {
   const tbody = document.getElementById('reviewTable');
   if (!thead || !tbody) return;
 
-  thead.innerHTML = `<tr><th style="position:sticky;right:0;background:#f8fafc;z-index:5">الفرع</th>${days.map(day => `<th>${day.label}<br><span style="font-size:9px;font-weight:400;opacity:0.7">${day.date.slice(5)}</span></th>`).join('')}<th>الحالة</th></tr>`;
+  thead.innerHTML = `<tr><th data-label="الفرع" style="position:sticky;right:0;background:#f8fafc;z-index:5">الفرع</th>${days.map(day => `<th data-label="${day.label} ${day.date.slice(5)}">${day.label}<br><span style="font-size:9px;font-weight:400;opacity:0.7">${day.date.slice(5)}</span></th>`).join('')}<th data-label="الحالة">الحالة</th></tr>`;
 
   let html = '';
   let allMissing = [];
 
   branches.forEach(b => {
-    let rowHtml = `<tr><td style="font-weight:700;position:sticky;right:0;background:white;z-index:5">${escapeHtml(b.name)}</td>`;
+    let rowHtml = `<tr><td data-label="الفرع" style="font-weight:700;position:sticky;right:0;background:white;z-index:5">${escapeHtml(b.name)}</td>`;
     let missing = 0;
     days.forEach(day => {
       const shift = DATABASE.shifts.find(s => String(s.branchId) === String(b.id) && s.date === day.date && (s.status === 'Approved' || s.status === 'Pending') && isOpeningShiftType(s.type));
+      const dayLabel = day.label + ' ' + day.date.slice(5);
       if (shift) {
-        rowHtml += `<td style="text-align:center;color:#16a34a;font-size:12px;cursor:pointer" onclick="navigateTo('pageCalendar')" title="${escapeHtml(shift.empName || '')} — ${shift.type || ''}">✅<br><span style="font-size:9px;color:#666">${escapeHtml(shift.empName || '').split(' ').slice(0,2).join(' ')}</span></td>`;
+        rowHtml += `<td data-label="${dayLabel}" style="text-align:center;color:#16a34a;font-size:12px;cursor:pointer" onclick="navigateTo('pageCalendar')" title="${escapeHtml(shift.empName || '')} — ${shift.type || ''}">✅<br><span style="font-size:9px;color:#666">${escapeHtml(shift.empName || '').split(' ').slice(0,2).join(' ')}</span></td>`;
       } else {
         missing++;
-        rowHtml += `<td style="text-align:center;color:#dc2626;font-size:16px;cursor:pointer" onclick="navigateTo('pageCalendar')" title="اضغط لإضافة شفتة">❌</td>`;
+        rowHtml += `<td data-label="${dayLabel}" style="text-align:center;color:#dc2626;font-size:16px;cursor:pointer" onclick="navigateTo('pageCalendar')" title="اضغط لإضافة شفتة">❌</td>`;
         allMissing.push({ branch: b.name, branchId: b.id, date: day.date, dayLabel: day.label });
       }
     });
     const status = missing === 0 ? '<span class="badge badge-approved">✓ مكتمل</span>' : `<span class="badge badge-rejected">⚠️ ${missing} ناقص</span>`;
-    rowHtml += `<td>${status}</td></tr>`;
+    rowHtml += `<td data-label="الحالة">${status}</td></tr>`;
     html += rowHtml;
   });
 
