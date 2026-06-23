@@ -3,7 +3,7 @@ function setupDatabase() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const schema = {
     Branches: ["id", "name", "password"],
-    Employees: ["id", "name", "branchId", "position", "status"],
+    Employees: ["id", "name", "branchId", "position", "status", "hireDate"],
     Shifts: ["id", "empId", "empName", "branchId", "date", "type", "start", "end", "status", "notes"],
     ShiftTypes: ["id", "name", "startTime", "endTime", "checkInStart", "checkInEnd", "isOpeningShift"],
     Leaves: ["id", "empId", "empName", "branchId", "date", "type", "quantity", "notes", "status"],
@@ -24,6 +24,8 @@ function setupDatabase() {
         sheet.appendRow(["S_rest_type", "rest_type", "flexible"]);
         sheet.appendRow(["S_annual_adays", "annual_leave_adays", "21"]);
         sheet.appendRow(["S_annual_cdays", "annual_leave_cdays", "6"]);
+        sheet.appendRow(["S_checkin_start", "checkin_start", "06:00"]);
+        sheet.appendRow(["S_checkin_end", "checkin_end", "12:00"]);
       }
     } else {
       const existing = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
@@ -72,7 +74,7 @@ function doPost(e) {
       sheet = ss.insertSheet(params.table);
       const headers = {
         Branches: ["id","name","password"],
-        Employees: ["id","name","branchId","position","status"],
+        Employees: ["id","name","branchId","position","status","hireDate"],
         Shifts: ["id","empId","empName","branchId","date","type","start","end","status","notes"],
         ShiftTypes: ["id","name","startTime","endTime","checkInStart","checkInEnd","isOpeningShift"],
         Leaves: ["id","empId","empName","branchId","date","type","quantity","notes","status"],

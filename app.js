@@ -11,9 +11,9 @@ function toggleDarkMode() {
 (function() { if (localStorage.getItem('darkMode') === '1') { document.body.classList.add('dark'); setTimeout(() => { const btn = document.getElementById('darkModeToggle'); if (btn) btn.textContent = '☀️ الوضع النهاري'; }, 100); } })();
 
 // ===== State =====
-const CLOUD_URL = "https://script.google.com/macros/s/AKfycbx2TTTdouTPXUX7vn5jmCZ8RaMaNbXSdTaDyh0Y4amd3x7ktl_rKqdoi-X9VQblAl5A/exec";
+const CLOUD_URL = "https://script.google.com/macros/s/AKfycbxOqKyls6cSeQw56OBVj3gbeYJ-P4_J6XscTRmbQ12fzWEjpwiz2uT-EGF39rVuvQtG/exec";
 let DATABASE = { branches: [], employees: [], shifts: [], shiftTypes: [], leaves: [], leaveTypes: [], leaveBalances: [], settings: [], attendance: [] };
-let currentRole = null, currentBranch = null, loginType = 'branch', branchStatusFilter = '', tempCellData = null;
+let currentRole = null, currentBranch = null, loginType = 'branch', tempCellData = null;
 let _sortState = {};
 let _pageSizes = { attendanceTable: 50, branchShiftsTable: 50, adminShiftsTable: 50, leavesTable: 50 };
 let _visibleCounts = {};
@@ -73,6 +73,22 @@ function addDaysToDate(dateStr, days) {
   return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
 }
 
+function calcDelayEarly(punchIn, punchOut, shiftStart, shiftEnd) {
+  let delayMin = 0, earlyLeaveMin = 0;
+  if (shiftStart && shiftEnd && punchIn) {
+    let sS = timeToMinutes(shiftStart), sE = timeToMinutes(shiftEnd);
+    let pI = timeToMinutes(punchIn), pO = punchOut ? timeToMinutes(punchOut) : null;
+    if (sE <= sS) {
+      if (pI < sS && pI <= 480) pI += 1440;
+      if (pO !== null && pO < sS && pO <= 480) pO += 1440;
+      sE += 1440;
+    }
+    delayMin = Math.max(0, pI - sS);
+    if (pO !== null) earlyLeaveMin = Math.max(0, sE - pO);
+  }
+  return { delayMin, earlyLeaveMin };
+}
+
 function normalizeAttendance(a) {
   a.date = normalizeDateString(a.date);
   a.start = formatTimeString(a.punchInTime);
@@ -87,16 +103,9 @@ function normalizeAttendance(a) {
   const shS = a.shiftStart || '';
   const shE = a.shiftEnd || '';
   if (shS && shE && a.start) {
-    let sS = timeToMinutes(shS), sE = timeToMinutes(shE);
-    let pI = timeToMinutes(a.start), pO = a.end ? timeToMinutes(a.end) : null;
-    if (sE <= sS) {
-      if (pI < sS && pI <= 480) pI += 1440;
-      if (pO !== null && pO < sS && pO <= 480) pO += 1440;
-      sE += 1440;
-    }
-    a.delayMin = Math.max(0, pI - sS);
-    if (pO !== null) a.earlyLeaveMin = Math.max(0, sE - pO);
-    else if (a.earlyLeaveMin === undefined || a.earlyLeaveMin === null) a.earlyLeaveMin = 0;
+    const r = calcDelayEarly(a.start, a.end, shS, shE);
+    a.delayMin = r.delayMin;
+    a.earlyLeaveMin = r.earlyLeaveMin;
   } else {
     if (a.delayMin === undefined || a.delayMin === null) a.delayMin = 0;
     if (a.earlyLeaveMin === undefined || a.earlyLeaveMin === null) a.earlyLeaveMin = 0;
@@ -228,17 +237,6 @@ function downloadCSV(csv, filename) {
   a.style.display = "none"; document.body.appendChild(a); a.click();
   document.body.removeChild(a);
 }
-function exportTableToExcel(containerId, filename) {
-  const table = document.querySelector(`#${containerId} table`);
-  if (!table) return showToast("لا توجد بيانات", "warning");
-  const rows = table.querySelectorAll("tr");
-  let csv = [];
-  rows.forEach(row => {
-    const cols = row.querySelectorAll("td:not(.action-btns-cell), th:not(.action-btns-cell)");
-    csv.push(Array.from(cols).map(c => '"' + c.innerText.replace(/"/g, '""').trim() + '"').join(","));
-  });
-  downloadCSV(csv.join("\n"), filename);
-}
 
 // === Login ===
 function setRole(role) {
@@ -293,6 +291,7 @@ function enterApp() {
   document.getElementById('userRoleLabel').textContent = currentRole === 'branch' ? 'فرع' : (currentRole === 'supervisor' ? 'مشرف اعتماد' : 'إدارة النظام');
   document.getElementById('userAvatar').textContent = currentRole === 'branch' ? '🏢' : (currentRole === 'supervisor' ? '🛡️' : '👑');
   populateDynamicSelects(); buildBottomNav(); showPage('pageCalendar');
+  restoreFilterStates();
   document.getElementById('bottomNav').style.display = '';
 }
 
@@ -301,25 +300,89 @@ const NAV_CONF = {
   supervisor: [{i:'📊',l:'لوحة التحكم',p:'pageDashboard'},{i:'🗓️',l:'الجدول',p:'pageCalendar'},{i:'⏰',l:'الحضور',p:'pageAttendance'},{i:'📋',l:'مراجعة الفتح',p:'pageReview'},{i:'✅',l:'الاعتمادات',p:'pageAdminShifts'},{i:'🏖️',l:'الإجراءات',p:'pageLeaves'},{i:'📊',l:'التقارير',p:'pageReports'},{i:'🔔',l:'الإشعارات',p:'pageNotifications'}],
   admin: [{i:'📊',l:'لوحة التحكم',p:'pageDashboard'},{i:'🗓️',l:'جدول الشفتات',p:'pageCalendar'},{i:'⏰',l:'الحضور',p:'pageAttendance'},{i:'📋',l:'مراجعة الفتح',p:'pageReview'},{i:'✅',l:'الاعتمادات',p:'pageAdminShifts'},{i:'🏖️',l:'الإجراءات',p:'pageLeaves'},{i:'👥',l:'الموظفون',p:'pageEmployees'},{i:'📊',l:'التقارير',p:'pageReports'},{i:'⚙️',l:'الإعدادات',p:'pageSettings'},{i:'🔔',l:'الإشعارات',p:'pageNotifications'}]
 };
-const NAV_MORE = { admin: [{i:'📊',l:'التقارير',p:'pageReports'},{i:'⚙️',l:'الإعدادات',p:'pageSettings'}], supervisor: [{i:'📊',l:'التقارير',p:'pageReports'}] };
+
+const NAV_BOTTOM = {
+  branch: [{i:'📊',l:'الرئيسية',p:'pageDashboard'},{i:'🗓️',l:'الجدول',p:'pageCalendar'},{i:'📅',l:'الشفتات',p:'pageBranchShifts'},{i:'🏖️',l:'الإجراءات',p:'pageLeaves'}],
+  supervisor: [{i:'📊',l:'الرئيسية',p:'pageDashboard'},{i:'🗓️',l:'الجدول',p:'pageCalendar'},{i:'⏰',l:'الحضور',p:'pageAttendance'},{i:'🏖️',l:'الإجراءات',p:'pageLeaves'}],
+  admin: [{i:'📊',l:'الرئيسية',p:'pageDashboard'},{i:'🗓️',l:'الجدول',p:'pageCalendar'},{i:'⏰',l:'الحضور',p:'pageAttendance'},{i:'🏖️',l:'الإجراءات',p:'pageLeaves'}]
+};
+
+const NAV_MORE = {
+  branch: [{i:'📋',l:'مراجعة الفتح',p:'pageReview'},{i:'⏰',l:'الحضور',p:'pageAttendance'},{i:'🔔',l:'الإشعارات',p:'pageNotifications'}],
+  supervisor: [{i:'📋',l:'مراجعة الفتح',p:'pageReview'},{i:'✅',l:'الاعتمادات',p:'pageAdminShifts'},{i:'📊',l:'التقارير',p:'pageReports'},{i:'🔔',l:'الإشعارات',p:'pageNotifications'}],
+  admin: [{i:'📋',l:'مراجعة الفتح',p:'pageReview'},{i:'✅',l:'الاعتمادات',p:'pageAdminShifts'},{i:'👥',l:'الموظفون',p:'pageEmployees'},{i:'📊',l:'التقارير',p:'pageReports'},{i:'⚙️',l:'الإعدادات',p:'pageSettings'},{i:'🔔',l:'الإشعارات',p:'pageNotifications'}]
+};
 
 function buildNav() {
   loadNotifications();
   const unread = NOTIFICATIONS.length;
-  document.getElementById('sidebarNav').innerHTML = NAV_CONF[currentRole].map(item => {
+  const moreItems = NAV_MORE[currentRole] || [];
+  const confPages = NAV_CONF[currentRole].map(n => n.p);
+  let html = NAV_CONF[currentRole].map(item => {
     const badge = item.p === 'pageNotifications' && unread > 0 ? `<span class="nav-badge">${unread > 99 ? '99+' : unread}</span>` : '';
     return `<div class="nav-item" onclick="showPage('${item.p}')" id="nav_${item.p}"><span class="nav-icon">${item.i}</span>${item.l}${badge}</div>`;
   }).join('');
+  const extraItems = moreItems.filter(n => !confPages.includes(n.p));
+  if (extraItems.length) {
+    html += `<div class="nav-section-divider">المزيد</div>`;
+    html += extraItems.map(item => {
+      const badge = item.p === 'pageNotifications' && unread > 0 ? `<span class="nav-badge">${unread > 99 ? '99+' : unread}</span>` : '';
+      return `<div class="nav-item" onclick="showPage('${item.p}')" id="nav_${item.p}"><span class="nav-icon">${item.i}</span>${item.l}${badge}</div>`;
+    }).join('');
+  }
+  document.getElementById('sidebarNav').innerHTML = html;
 }
+
 function buildBottomNav() {
-  const items = NAV_CONF[currentRole];
-  document.getElementById('bottomNavInner').innerHTML = items.map(item =>
-    item.p === '' ? `<button class="bnav-item" onclick="openBnavMore()" id="bnav_more"><span class="bnav-icon">📊</span>المزيد</button>`
-    : `<button class="bnav-item" onclick="showPage('${item.p}')" id="bnav_${item.p}"><span class="bnav-icon">${item.i}</span>${item.l}</button>`
-  ).join('');
-  document.getElementById('bnavMoreMenu').innerHTML = `<div class="bnav-more-handle"></div>` +
-    (NAV_MORE[currentRole] || []).map(item => `<button class="bnav-more-item" onclick="showPage('${item.p}')"><span class="bnav-mi">${item.i}</span>${item.l}</button>`).join('');
+  const items = NAV_BOTTOM[currentRole] || [];
+  const moreItems = NAV_MORE[currentRole] || [];
+  const notifInMore = moreItems.find(n => n.p === 'pageNotifications');
+  const unreadCount = notifInMore ? NOTIFICATIONS.length : 0;
+  let html = items.map(item => {
+    const badge = (item.p === 'pageNotifications' && NOTIFICATIONS.length > 0) ? `<span class="bnav-badge">${NOTIFICATIONS.length > 99 ? '99+' : NOTIFICATIONS.length}</span>` : '';
+    return `<button class="bnav-item" onclick="showPage('${item.p}')" id="bnav_${item.p}"><span class="bnav-icon">${item.i}</span><span class="bnav-label">${item.l}</span>${badge}</button>`;
+  }).join('');
+  const moreBadge = unreadCount > 0 ? `<span class="bnav-badge">${unreadCount > 99 ? '99+' : unreadCount}</span>` : '';
+  html += `<button class="bnav-item" onclick="openBnavMore()" id="bnav_more"><span class="bnav-icon">☰</span><span class="bnav-label">المزيد</span>${moreBadge}</button>`;
+  document.getElementById('bottomNavInner').innerHTML = html;
+  let moreHtml = `<div class="bnav-more-handle"></div><div class="bnav-more-title">القائمة</div>`;
+  moreHtml += moreItems.map(item => {
+    const badge = (item.p === 'pageNotifications' && NOTIFICATIONS.length > 0) ? `<span class="bnav-more-badge">${NOTIFICATIONS.length}</span>` : '';
+    return `<button class="bnav-more-item" onclick="showPage('${item.p}')"><span class="bnav-mi">${item.i}</span><span class="bnav-mi-text">${item.l}</span>${badge}</button>`;
+  }).join('');
+  document.getElementById('bnavMoreMenu').innerHTML = moreHtml;
 }
+
+function refreshNavBadges() {
+  const unread = NOTIFICATIONS.length;
+  const moreBtn = document.getElementById('bnav_more');
+  if (moreBtn) {
+    const existingBadge = moreBtn.querySelector('.bnav-badge');
+    if (unread > 0) { if (existingBadge) existingBadge.textContent = unread > 99 ? '99+' : unread; else moreBtn.insertAdjacentHTML('beforeend', `<span class="bnav-badge">${unread > 99 ? '99+' : unread}</span>`); }
+    else if (existingBadge) existingBadge.remove();
+  }
+}
+
+function toggleFilterPanel(btn) {
+  const body = btn.nextElementSibling;
+  const chevron = btn.querySelector('.filter-chevron');
+  const isOpen = body.classList.toggle('open');
+  if (chevron) chevron.textContent = isOpen ? '▴' : '▾';
+  const panelId = body.closest('.page')?.id || '';
+  if (panelId) localStorage.setItem('filter_' + panelId, isOpen ? '1' : '0');
+}
+
+function restoreFilterStates() {
+  document.querySelectorAll('.filter-body').forEach(body => {
+    const pageId = body.closest('.page')?.id;
+    if (pageId && localStorage.getItem('filter_' + pageId) === '1') {
+      body.classList.add('open');
+      const btn = body.previousElementSibling;
+      if (btn) { const ch = btn.querySelector('.filter-chevron'); if (ch) ch.textContent = '▴'; }
+    }
+  });
+}
+
 function openBnavMore() { document.getElementById('bnavMoreOverlay').classList.add('open'); document.getElementById('bnavMoreMenu').classList.add('open'); }
 function closeBnavMore() { document.getElementById('bnavMoreOverlay').classList.remove('open'); document.getElementById('bnavMoreMenu').classList.remove('open'); }
 
@@ -503,7 +566,7 @@ async function saveShift() {
   while (current <= end) {
     const dStr = current.toISOString().split('T')[0];
     if (!DATABASE.shifts.find(s => String(s.empId) === String(empId) && s.date === dStr && String(s.id) !== String(editId)))
-      toSave.push({ id: editId || ('s'+Date.now()+Math.random().toString(36).substr(2,4)), empId, empName: emp?.name, branchId: bId, date: dStr, type: typeVal, start: startVal, end: endVal, notes, status: statusVal });
+      toSave.push({ id: editId ? (dStr === startDate ? editId : editId + '_' + dStr) : ('s'+Date.now()+Math.random().toString(36).substr(2,4)), empId, empName: emp?.name, branchId: bId, date: dStr, type: typeVal, start: startVal, end: endVal, notes, status: statusVal });
     else if (current.getTime() === new Date(startDate).getTime()) return showToast(`يوجد شفت يوم ${dStr}`, 'error');
     current.setDate(current.getDate() + 1);
   }
@@ -535,7 +598,7 @@ function openLeaveModal(id = null) {
     populateModalEmployees('leave');
     const today = new Date().toISOString().slice(0,10);
     document.getElementById('leaveDate').value = today; document.getElementById('leaveEndDate').value = today;
-    document.getElementById('leaveEndDateGroup').style.display = 'block';
+    document.getElementById('leaveEndDateGroup').style.display = 'none';
     document.getElementById('leaveType').value = ''; document.getElementById('leaveQuantity').value = ''; document.getElementById('leaveNotes').value = '';
     if (currentRole !== 'branch') document.getElementById('leaveStatusModal').value = 'Pending';
     document.getElementById('btnDelLeave').style.display = 'none';
@@ -547,21 +610,22 @@ function openLeaveModal(id = null) {
 
 async function saveLeave() {
   const empId = document.getElementById('leaveEmployee').value, bId = currentRole === 'branch' ? currentBranch.id : document.getElementById('leaveBranch').value;
-  const startDate = document.getElementById('leaveDate').value, endDate = document.getElementById('leaveEndDate').value || startDate;
+  const startDate = document.getElementById('leaveDate').value;
   const typeVal = document.getElementById('leaveType').value, quantityVal = document.getElementById('leaveQuantity').value, notes = document.getElementById('leaveNotes').value;
   if (!empId || !startDate || !typeVal || !quantityVal) return showToast('أكمل الحقول', 'error');
   if (typeVal !== 'أعياد') {
-    const days = Math.round((new Date(endDate) - new Date(startDate)) / 86400000) + 1;
+    const days = parseInt(quantityVal) || 1;
     const bal = getLeaveBalance(empId, typeVal);
     if (bal.remaining < days) return showToast(`الرصيد المتبقي (${bal.remaining}) أقل من المطلوب (${days})`, 'error');
   }
   const emp = DATABASE.employees.find(e => String(e.id) === String(empId));
   const editId = document.getElementById('leaveEditId').value;
   const statusVal = currentRole === 'branch' ? (editId ? DATABASE.leaves.find(s=>s.id===editId)?.status || 'Pending' : 'Pending') : document.getElementById('leaveStatusModal').value;
-  let current = new Date(startDate), end = new Date(endDate), toSave = [];
-  while (current <= end) {
+  const days = parseInt(quantityVal) || 1;
+  let current = new Date(startDate), toSave = [];
+  for (let i = 0; i < days; i++) {
     const dStr = current.toISOString().split('T')[0];
-    toSave.push({ id: editId || ('lv'+Date.now()+Math.random().toString(36).substr(2,4)), empId, empName: emp?.name, branchId: bId, date: dStr, type: typeVal, quantity: quantityVal, notes, status: statusVal });
+    toSave.push({ id: editId ? (i === 0 ? editId : editId + '_' + i) : ('lv'+Date.now()+Math.random().toString(36).substr(2,4)+i), empId, empName: emp?.name, branchId: bId, date: dStr, type: typeVal, quantity: '1', notes, status: statusVal });
     current.setDate(current.getDate() + 1);
   }
   if (await cloudAction('Leaves', 'bulk_save', toSave)) {
@@ -572,13 +636,11 @@ async function saveLeave() {
 
 // === Leave Balance ===
 function getYear() { return new Date().getFullYear(); }
-function getEmpHireYear() { return null; }
-
 function calcOpeningBalance(empId, leaveTypeName) {
   const year = getYear();
   const lt = DATABASE.leaveTypes.find(t => t.name === leaveTypeName);
   if (!lt || lt.name === 'أعياد') return 0;
-  const annual = parseInt(lt.annualBalance) || 0;
+  const annual = parseInt(lt.annualBalance) || parseInt(DATABASE.settings.find(s => s.key === 'annual_leave_adays')?.value) || 0;
   if (annual <= 0) return 0;
   const emp = DATABASE.employees.find(e => String(e.id) === String(empId));
   if (!emp || !emp.hireDate) return annual;
@@ -778,11 +840,8 @@ function renderList(tableId, dbArray, branchId, dateStartId, dateEndId, statusId
       const punchOut = item.end || '--';
       let liveDelay = 0, liveEarly = 0;
       if (shS && shE && punchIn !== '--') {
-        let sS2 = timeToMinutes(shS), sE2 = timeToMinutes(shE);
-        let pI2 = timeToMinutes(punchIn), pO2 = punchOut !== '--' ? timeToMinutes(punchOut) : null;
-        if (sE2 <= sS2) { if (pI2 < sS2 && pI2 <= 480) pI2 += 1440; if (pO2 !== null && pO2 < sS2 && pO2 <= 480) pO2 += 1440; sE2 += 1440; }
-        liveDelay = Math.max(0, pI2 - sS2);
-        if (pO2 !== null) liveEarly = Math.max(0, sE2 - pO2);
+        const r = calcDelayEarly(punchIn, punchOut !== '--' ? punchOut : null, shS, shE);
+        liveDelay = r.delayMin; liveEarly = r.earlyLeaveMin;
       }
       let delayStr = '--';
       if (liveDelay > 0) delayStr = `<span style="color:var(--danger);font-weight:600">${liveDelay} د</span>`;
@@ -890,11 +949,8 @@ function renderShiftsComparison() {
     }
     let liveDelay = 0, liveEarly = 0;
     if (shiftStartTime && shiftEndTime && punchIn !== '-') {
-      let sS = timeToMinutes(shiftStartTime), sE = timeToMinutes(shiftEndTime);
-      let pI = timeToMinutes(punchIn), pO = punchOut !== '-' ? timeToMinutes(punchOut) : null;
-      if (sE <= sS) { if (pI < sS && pI <= 480) pI += 1440; if (pO !== null && pO < sS && pO <= 480) pO += 1440; sE += 1440; }
-      liveDelay = Math.max(0, pI - sS);
-      if (pO !== null) liveEarly = Math.max(0, sE - pO);
+      const r = calcDelayEarly(punchIn, punchOut !== '-' ? punchOut : null, shiftStartTime, shiftEndTime);
+      liveDelay = r.delayMin; liveEarly = r.earlyLeaveMin;
     }
     const delayColor = liveDelay > 0 ? 'var(--danger)' : 'var(--success)';
     const earlyColor = liveEarly > 0 ? 'var(--danger)' : 'var(--success)';
@@ -961,11 +1017,8 @@ async function saveAttendance() {
   const shiftEnd = stObj ? stObj.endTime : '';
   let delayCalc = 0, earlyCalc = 0;
   if (shiftStart && shiftEnd && punchIn) {
-    let sStart = timeToMinutes(shiftStart), sEnd = timeToMinutes(shiftEnd);
-    let pIn = timeToMinutes(punchIn), pOut = punchOut ? timeToMinutes(punchOut) : null;
-    if (sEnd <= sStart) { if (pIn < sStart && pIn <= 480) pIn += 1440; if (pOut !== null && pOut < sStart && pOut <= 480) pOut += 1440; sEnd += 1440; }
-    delayCalc = Math.max(0, pIn - sStart);
-    if (pOut !== null) earlyCalc = Math.max(0, sEnd - pOut);
+    const r = calcDelayEarly(punchIn, punchOut, shiftStart, shiftEnd);
+    delayCalc = r.delayMin; earlyCalc = r.earlyLeaveMin;
   }
   const data = { id: editId || ('att'+Date.now()+Math.random().toString(36).substr(2,4)), empId, empName: emp?.name, branchId: bId, date, day: dayNames[dayOfWeek], shiftType, punchInTime: punchIn, punchOutTime: punchOut, start: punchIn, end: punchOut, shiftStart, shiftEnd, delayMin: delayCalc, earlyLeaveMin: earlyCalc, delay: delayCalc > 0 ? delayCalc + ' د' : '', earlyLeave: earlyCalc > 0 ? earlyCalc + ' د' : '', notes, status: statusVal };
   if (await cloudAction('Attendance', 'save', data)) {
@@ -1096,17 +1149,8 @@ function handleAttendanceImport(file) {
       }
       let delayMin = 0, earlyLeaveMin = 0;
       if (shiftStart && shiftEnd && punchIn) {
-        let sStart = timeToMinutes(shiftStart);
-        let sEnd = timeToMinutes(shiftEnd);
-        let pIn = timeToMinutes(punchIn);
-        let pOut = punchOut ? timeToMinutes(punchOut) : null;
-        if (sEnd <= sStart) {
-          if (pIn < sStart && pIn <= 480) pIn += 1440;
-          if (pOut !== null && pOut < sStart && pOut <= 480) pOut += 1440;
-          sEnd += 1440;
-        }
-        delayMin = Math.max(0, pIn - sStart);
-        if (pOut !== null) earlyLeaveMin = Math.max(0, sEnd - pOut);
+        const r = calcDelayEarly(punchIn, punchOut, shiftStart, shiftEnd);
+        delayMin = r.delayMin; earlyLeaveMin = r.earlyLeaveMin;
       }
       const dayNames = ['الأحد','الإثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
       const dayOfWeek = new Date(g.date + 'T12:00:00').getDay();
@@ -1265,15 +1309,15 @@ function openEmpModal(id = null) {
   if (currentRole !== 'admin') return showToast('غير مسموح', 'error');
   document.getElementById('empEditId').value = id || '';
   document.getElementById('empBranch').innerHTML = DATABASE.branches.map(b => `<option value="${b.id}">${b.name}</option>`).join('');
-  if (id) { const e = DATABASE.employees.find(x => String(x.id) === String(id)); document.getElementById('empId').value = e.id; document.getElementById('empId').disabled = true; document.getElementById('empName').value = e.name; document.getElementById('empBranch').value = e.branchId; document.getElementById('empPosition').value = e.position||''; document.getElementById('empStatus').value = e.status; }
-  else { document.getElementById('empId').disabled = false; document.getElementById('empId').value = ''; document.getElementById('empName').value = ''; document.getElementById('empPosition').value = ''; document.getElementById('empStatus').value = 'active'; }
+  if (id) { const e = DATABASE.employees.find(x => String(x.id) === String(id)); document.getElementById('empId').value = e.id; document.getElementById('empId').disabled = true; document.getElementById('empName').value = e.name; document.getElementById('empBranch').value = e.branchId; document.getElementById('empPosition').value = e.position||''; document.getElementById('empHireDate').value = e.hireDate||''; document.getElementById('empStatus').value = e.status; }
+  else { document.getElementById('empId').disabled = false; document.getElementById('empId').value = ''; document.getElementById('empName').value = ''; document.getElementById('empPosition').value = ''; document.getElementById('empHireDate').value = ''; document.getElementById('empStatus').value = 'active'; }
   openModal('empModal');
 }
 async function saveEmployee() {
   if (currentRole !== 'admin') return showToast('غير مسموح', 'error');
   const id = document.getElementById('empId').value.trim(), editId = document.getElementById('empEditId').value;
   if (!id || !document.getElementById('empName').value.trim()) return showToast('أكمل الحقول', 'error');
-  const data = { id: editId || id, name: document.getElementById('empName').value, branchId: document.getElementById('empBranch').value, position: document.getElementById('empPosition').value, status: document.getElementById('empStatus').value };
+  const data = { id: editId || id, name: document.getElementById('empName').value, branchId: document.getElementById('empBranch').value, position: document.getElementById('empPosition').value, hireDate: document.getElementById('empHireDate').value, status: document.getElementById('empStatus').value };
   if (await cloudAction('Employees', 'save', data)) {
     showToast('تم الحفظ', 'success'); closeModal('empModal');
   }
@@ -1324,11 +1368,8 @@ function renderReport() {
       const punchOut = i.punchOutTime || i.end || '';
       let liveDelay = 0, liveEarly = 0;
       if (shStart && shEnd && punchIn) {
-        let sS = timeToMinutes(shStart), sE = timeToMinutes(shEnd);
-        let pI = timeToMinutes(punchIn), pO = punchOut ? timeToMinutes(punchOut) : null;
-      if (sE <= sS) { if (pI < sS && pI <= 480) pI += 1440; if (pO !== null && pO < sS && pO <= 480) pO += 1440; sE += 1440; }
-        liveDelay = Math.max(0, pI - sS);
-        if (pO !== null) liveEarly = Math.max(0, sE - pO);
+        const r = calcDelayEarly(punchIn, punchOut || null, shStart, shEnd);
+        liveDelay = r.delayMin; liveEarly = r.earlyLeaveMin;
       }
       const delayStr = liveDelay > 0 ? `<span style="color:var(--danger);font-weight:600">${liveDelay} د</span>` : '<span style="color:var(--success)">✓</span>';
       const earlyStr = liveEarly > 0 ? `<span style="color:var(--danger);font-weight:600">${liveEarly} د</span>` : '<span style="color:var(--success)">✓</span>';
