@@ -148,49 +148,52 @@ function fetchCloudData(isRefresh = false, retriesLeft = 6, silentRefresh = fals
     }
 
     showLoading(true);
-    const timeout = setTimeout(() => { showLoading(false); showToast("انتهت المهلة", "error"); resolve(); }, 8000);
+    const timeout = setTimeout(() => { showLoading(false); showToast("انتهت المهلة", "error"); resolve(); }, 15000);
     const mySeq = ++_cloudSeq;
 
-    window.cloudDataCallback = function(json) {
-      if (mySeq !== _cloudSeq) return;
-      clearTimeout(timeout);
-      if (Array.isArray(json.branches)) DATABASE.branches = json.branches;
-      if (Array.isArray(json.employees)) DATABASE.employees = json.employees;
-      if (json.settings !== undefined && Array.isArray(json.settings)) DATABASE.settings = json.settings;
-      if (Array.isArray(json.shiftTypes)) DATABASE.shiftTypes = json.shiftTypes;
-      if (Array.isArray(json.leaveTypes)) DATABASE.leaveTypes = json.leaveTypes;
-      if (Array.isArray(json.leaveBalances)) DATABASE.leaveBalances = json.leaveBalances;
-      if (Array.isArray(json.shifts)) DATABASE.shifts = json.shifts;
-      if (Array.isArray(json.leaves)) DATABASE.leaves = json.leaves;
-      if (Array.isArray(json.attendance)) DATABASE.attendance = json.attendance;
+    fetch(CLOUD_URL + (CLOUD_URL.includes('?') ? '&' : '?') + '_=' + Date.now(), { method: "GET", redirect: "follow" })
+      .then(r => r.json())
+      .then(json => {
+        if (mySeq !== _cloudSeq) return;
+        clearTimeout(timeout);
+        if (Array.isArray(json.branches)) DATABASE.branches = json.branches;
+        if (Array.isArray(json.employees)) DATABASE.employees = json.employees;
+        if (json.settings !== undefined && Array.isArray(json.settings)) DATABASE.settings = json.settings;
+        if (Array.isArray(json.shiftTypes)) DATABASE.shiftTypes = json.shiftTypes;
+        if (Array.isArray(json.leaveTypes)) DATABASE.leaveTypes = json.leaveTypes;
+        if (Array.isArray(json.leaveBalances)) DATABASE.leaveBalances = json.leaveBalances;
+        if (Array.isArray(json.shifts)) DATABASE.shifts = json.shifts;
+        if (Array.isArray(json.leaves)) DATABASE.leaves = json.leaves;
+        if (Array.isArray(json.attendance)) DATABASE.attendance = json.attendance;
 
-      DATABASE.shiftTypes.forEach(t => { t.startTime = formatTimeString(t.startTime); t.endTime = formatTimeString(t.endTime); t.checkInStart = formatTimeString(t.checkInStart); t.checkInEnd = formatTimeString(t.checkInEnd); });
-      DATABASE.shifts.forEach(s => { s.date = normalizeDateString(s.date); s.start = formatTimeString(s.start); s.end = formatTimeString(s.end); });
-      DATABASE.leaves.forEach(l => { l.date = normalizeDateString(l.date); });
-      DATABASE.attendance.forEach(a => normalizeAttendance(a));
+        DATABASE.shiftTypes.forEach(t => { t.startTime = formatTimeString(t.startTime); t.endTime = formatTimeString(t.endTime); t.checkInStart = formatTimeString(t.checkInStart); t.checkInEnd = formatTimeString(t.checkInEnd); });
+        DATABASE.shifts.forEach(s => { s.date = normalizeDateString(s.date); s.start = formatTimeString(s.start); s.end = formatTimeString(s.end); });
+        DATABASE.leaves.forEach(l => { l.date = normalizeDateString(l.date); });
+        DATABASE.attendance.forEach(a => normalizeAttendance(a));
 
-      const hasData = json.branches?.length || json.employees?.length || json.shifts?.length;
-      if (!hasData && retriesLeft > 0) {
+        const hasData = json.branches?.length || json.employees?.length || json.shifts?.length;
+        if (!hasData && retriesLeft > 0) {
+          showLoading(false);
+          if (isRefresh) showToast(`تحديث... (${7 - retriesLeft}/6)`, 'warning');
+          setTimeout(() => fetchCloudData(isRefresh, retriesLeft - 1, silentRefresh).then(resolve), 3000);
+          return;
+        }
+
+        cacheAttendance(DATABASE.attendance);
+
+        if (!isRefresh) { populateBranchSelect(); refreshActivePage(); }
+        else { if (!silentRefresh) showToast("تم", "success"); refreshActivePage(); }
+
+        if (isRefresh) generateNotificationsFromData();
+        showLoading(false); resolve();
+      })
+      .catch(err => {
+        if (mySeq !== _cloudSeq) return;
+        clearTimeout(timeout);
         showLoading(false);
-        if (isRefresh) showToast(`تحديث... (${7 - retriesLeft}/6)`, 'warning');
-        setTimeout(() => fetchCloudData(isRefresh, retriesLeft - 1, silentRefresh).then(resolve), 3000);
-        return;
-      }
-
-      cacheAttendance(DATABASE.attendance);
-
-      if (!isRefresh) { populateBranchSelect(); refreshActivePage(); }
-      else { if (!silentRefresh) showToast("تم", "success"); refreshActivePage(); }
-
-      if (isRefresh) generateNotificationsFromData();
-      showLoading(false); resolve();
-    };
-
-    const s = document.createElement('script');
-    s.src = CLOUD_URL + (CLOUD_URL.includes('?') ? '&' : '?') + 'callback=cloudDataCallback&_=' + Date.now();
-    s.onerror = function() { if (mySeq !== _cloudSeq) return; clearTimeout(timeout); showLoading(false); showToast("خطأ في جلب البيانات - تأكد من صلاحيات النشر", "error"); resolve(); };
-    document.body.appendChild(s);
-    s.onload = function() { s.remove(); };
+        showToast("خطأ في جلب البيانات: " + err.message, "error");
+        resolve();
+      });
   });
 }
 
