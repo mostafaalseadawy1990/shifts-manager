@@ -209,7 +209,7 @@ window.jspdf = null;
   .bnav-badge { position: absolute; top: 4px; right: calc(50% - 16px); background: #ef4444; color: white; font-size: 8px; font-weight: 700; min-width: 14px; height: 14px; line-height: 14px; text-align: center; border-radius: 7px; padding: 0 3px; box-shadow: 0 1px 3px rgba(239,68,68,0.3); }
   .bnav-more-overlay { position: fixed; inset: 0; background: rgba(15,23,42,0.4); z-index: 998; display: none; opacity: 0; transition: opacity 0.25s ease; }
   .bnav-more-overlay.open { display: block; opacity: 1; }
-  .bnav-more-menu { position: fixed; bottom: 0; left: 0; right: 0; background: white; border-radius: 20px 20px 0 0; box-shadow: 0 -8px 40px rgba(0,0,0,0.15); z-index: 999; display: none; flex-direction: column; padding: 8px 8px calc(20px + var(--safe-bottom)); max-height: 65vh; overflow-y: auto; transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.16,1,0.3,1); }
+  .bnav-more-menu { position: fixed; bottom: 0; left: 0; right: 0; background: white; border-radius: 20px 20px 0 0; box-shadow: 0 -8px 40px rgba(0,0,0,0.15); z-index: 999; display: none; flex-direction: column; padding: 8px 8px calc(var(--bottom-nav-height) + var(--safe-bottom) + 16px); max-height: 65vh; overflow-y: auto; transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.16,1,0.3,1); }
   .bnav-more-menu.open { display: flex; transform: translateY(0); }
   .bnav-more-handle { width: 36px; height: 4px; background: #d1d5db; border-radius: 2px; margin: 4px auto 8px; flex-shrink: 0; }
   .bnav-more-title { font-size: 13px; font-weight: 700; color: var(--text-muted); padding: 4px 16px 8px; text-align: right; }
@@ -291,7 +291,6 @@ window.jspdf = null;
     .main-content { margin-right: 0; width: 100%; padding: var(--gap-sm); padding-bottom: calc(var(--bottom-nav-height) + var(--safe-bottom) + 16px); }
     .global-search { margin: calc(-1 * var(--gap-sm)) calc(-1 * var(--gap-sm)) var(--gap-sm); padding: 8px 0; }
     .global-search-kbd { display: none; }
-    .global-search-input { font-size: 13px; padding: 8px 12px 8px 36px; }
     .global-search-icon { left: 10px; font-size: 14px; }
     .global-search-clear { left: 32px; }
     .global-search-results { max-height: 300px; }
@@ -310,7 +309,8 @@ window.jspdf = null;
     table:not(.cal-table) td:last-child { border-bottom: none; }
     table:not(.cal-table) td::before { content: attr(data-label); font-weight: 700; color: var(--primary); margin-left: 12px; min-width: 80px; font-size: 11px; flex-shrink: 0; opacity: 0.8; }
     table:not(.cal-table) tbody tr td:first-child { background: #f8fafc; font-weight: 700; font-size: 14px; padding: 10px 12px; border-bottom: 1px solid var(--border); }
-    table:not(.cal-table) td[data-label="الموظف"], table:not(.cal-table) td[data-label="الفرع"] { background: #f8fafc; font-weight: 700; font-size: 14px; padding: 10px 12px; border-bottom: 1px solid var(--border); }
+    table:not(.cal-table) td[data-label="الموظف"], table:not(.cal-table) td[data-label="الفرع"] { background: #f8fafc; font-weight: 700; font-size: 14px; padding: 10px 12px; border-bottom: 1px solid var(--border); flex-direction: column; align-items: flex-start; gap: 2px; }
+    table:not(.cal-table) td[data-label="الموظف"]::before, table:not(.cal-table) td[data-label="الفرع"]::before { margin-left: 0; margin-bottom: 4px; }
     table:not(.cal-table) td:last-child { padding: 8px 12px; justify-content: flex-end; background: #fafbfc; }
     table:not(.cal-table) td .action-btns { justify-content: flex-end; }
     .custom-checkbox { width: 20px; height: 20px; }
@@ -328,8 +328,6 @@ window.jspdf = null;
     .filter-bar { gap: 8px; padding: 10px; }
     .filter-bar input, .filter-bar select { font-size: 14px; padding: 10px 12px; min-height: 44px; }
     .filter-label { font-size: 11px; }
-    .filter-bar .date-range { flex-direction: row !important; }
-    .filter-bar .date-range input { flex: 1 1 48% !important; min-width: 45% !important; }
     .table-wrap { max-height: 50vh; }
     .table-wrap table { font-size: 12px; }
     .mobile-split { display: flex; flex-direction: column; height: calc(100vh - var(--bottom-nav-height) - var(--safe-bottom) - 56px); overflow: hidden; }
@@ -343,11 +341,6 @@ window.jspdf = null;
     .mobile-split .split-filters .filter-bar { gap: 6px; padding: 8px 10px; flex-wrap: wrap; }
     .mobile-split .split-filters .filter-bar input, .mobile-split .split-filters .filter-bar select { flex: 1 1 45%; min-width: 45%; font-size: 13px; padding: 8px 10px; min-height: 40px; border-radius: 8px; }
     .mobile-split .split-filters .filter-label { font-size: 10px; font-weight: 600; }
-    .filter-toggle { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: white; border: 1px solid var(--border); border-radius: var(--radius-sm); margin-bottom: 4px; cursor: pointer; font-size: 13px; font-weight: 600; color: var(--primary); width: 100%; font-family: 'Tajawal', sans-serif; -webkit-tap-highlight-color: transparent; }
-    .filter-toggle .filter-count { font-size: 10px; background: var(--accent); color: white; padding: 2px 8px; border-radius: 10px; font-weight: 700; }
-    .filter-toggle .filter-chevron { font-size: 12px; color: var(--text-muted); }
-    .filter-body { overflow: hidden; transition: max-height 0.3s ease, opacity 0.2s ease; max-height: 0; opacity: 0; }
-    .filter-body.open { max-height: 35vh; opacity: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
     .page-title h2 { font-size: 17px; }
     .page-title p { font-size: 10px; }
     .header-actions button, .export-actions button { font-size: 11px; padding: 6px 12px; min-height: 36px; }
@@ -372,7 +365,6 @@ window.jspdf = null;
     .header-actions { flex-wrap: wrap; gap: 6px; }
     .action-btns { gap: 4px; }
     .action-btns .btn { min-width: 32px; min-height: 32px; padding: 4px 6px; }
-    table:not(.cal-table) td { font-size: 11px; padding: 6px 8px; }
     .copy-shift-btn { display: none !important; }
     @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
   }
@@ -433,7 +425,7 @@ window.jspdf = null;
     .action-btns .btn { min-width: 28px; min-height: 28px; padding: 4px 5px; font-size: 10px; }
     .global-search-input { font-size: 14px !important; padding: 10px 12px 10px 32px !important; }
     .global-search { padding: 6px 0; margin: -8px -8px 8px; }
-    .bnav-more-menu { max-height: 60vh; padding-bottom: calc(24px + var(--safe-bottom)); }
+    .bnav-more-menu { max-height: 60vh; padding-bottom: calc(var(--bottom-nav-height) + var(--safe-bottom) + 16px); }
     .bnav-more-item { padding: 12px 14px; font-size: 14px; min-height: 44px; gap: 12px; }
     .bnav-more-item .bnav-mi { font-size: 18px; width: 28px; height: 28px; }
     .notif-item { padding: 10px 12px; gap: 8px; }
@@ -462,7 +454,7 @@ window.jspdf = null;
     .sidebar, .mobile-menu-btn, .bottom-nav, .bnav-more-overlay, .bnav-more-menu,
     .page-header, .filter-bar, .action-btns, .custom-checkbox, .export-actions,
     .stats-grid, .empty-state, #cloudLoading, .toast-container,
-    .global-search, #alertsContainer, .filter-toggle, .filter-body { display: none !important; }
+    .global-search, #alertsContainer { display: none !important; }
     .main-content { margin: 0 !important; width: 100% !important; padding: 15mm !important; }
     .page { display: block !important; page-break-after: always; }
     .page:last-child { page-break-after: avoid; }
@@ -522,7 +514,6 @@ window.jspdf = null;
   body.dark .bnav-item { color: rgba(255,255,255,0.45); }
   body.dark .bnav-item.active { color: var(--accent); }
   body.dark .nav-section-divider { color: rgba(255,255,255,0.2); border-top-color: rgba(255,255,255,0.06); }
-  body.dark .filter-toggle { background: #1e293b; border-color: #334155; color: #94a3b8; }
   body.dark table:not(.cal-table) tbody tr td:first-child { background: #1e293b; }
   body.dark table:not(.cal-table) td:last-child { background: #172032; }
   body.dark .stat-number { color: #e2e8f0; }
@@ -685,7 +676,7 @@ window.jspdf = null;
           <div class="card">
             <div class="table-wrap">
               <table id="branchTableId">
-                  <thead><tr><th>الموظف</th><th>الوظيفة</th><th>التاريخ</th><th>النوع</th><th>من</th><th>إلى</th><th>الحالة</th><th>إجراءات</th></tr></thead>
+                  <thead id="branchShiftsThead"><tr><th>الموظف</th><th>التاريخ</th><th>النوع</th><th>من</th><th>إلى</th><th>الحالة</th><th>إجراءات</th></tr></thead>
                   <tbody id="branchShiftsTable"></tbody>
               </table>
             </div>

@@ -291,7 +291,6 @@ function enterApp() {
   document.getElementById('userRoleLabel').textContent = currentRole === 'branch' ? 'فرع' : (currentRole === 'supervisor' ? 'مشرف اعتماد' : 'إدارة النظام');
   document.getElementById('userAvatar').textContent = currentRole === 'branch' ? '🏢' : (currentRole === 'supervisor' ? '🛡️' : '👑');
   populateDynamicSelects(); buildBottomNav(); showPage('pageCalendar');
-  restoreFilterStates();
   document.getElementById('bottomNav').style.display = '';
 }
 
@@ -361,26 +360,6 @@ function refreshNavBadges() {
     if (unread > 0) { if (existingBadge) existingBadge.textContent = unread > 99 ? '99+' : unread; else moreBtn.insertAdjacentHTML('beforeend', `<span class="bnav-badge">${unread > 99 ? '99+' : unread}</span>`); }
     else if (existingBadge) existingBadge.remove();
   }
-}
-
-function toggleFilterPanel(btn) {
-  const body = btn.nextElementSibling;
-  const chevron = btn.querySelector('.filter-chevron');
-  const isOpen = body.classList.toggle('open');
-  if (chevron) chevron.textContent = isOpen ? '▴' : '▾';
-  const panelId = body.closest('.page')?.id || '';
-  if (panelId) localStorage.setItem('filter_' + panelId, isOpen ? '1' : '0');
-}
-
-function restoreFilterStates() {
-  document.querySelectorAll('.filter-body').forEach(body => {
-    const pageId = body.closest('.page')?.id;
-    if (pageId && localStorage.getItem('filter_' + pageId) === '1') {
-      body.classList.add('open');
-      const btn = body.previousElementSibling;
-      if (btn) { const ch = btn.querySelector('.filter-chevron'); if (ch) ch.textContent = '▴'; }
-    }
-  });
 }
 
 function openBnavMore() { document.getElementById('bnavMoreOverlay').classList.add('open'); document.getElementById('bnavMoreMenu').classList.add('open'); }
@@ -806,9 +785,10 @@ function renderList(tableId, dbArray, branchId, dateStartId, dateEndId, statusId
     ? [thSort('date','التاريخ'), thSort('start','من'), thSort('end','إلى'), thSort('status','الحالة')].join('')
     : [thSort('date','التاريخ'), thSort('type','النوع'), thSort('quantity','الكمية'), thSort('notes','ملاحظات'), thSort('status','الحالة')].join('');
 
-  if (thead) thead.innerHTML = `<tr>${isAdmin ? '<th style="width:30px"><input type="checkbox" class="custom-checkbox" onchange="toggleAllCB(\''+cbKey+'\',this.checked)"></th>' + thSort('branch','الفرع') : ''}${thSort('empName','الموظف')}${thSort('position','الوظيفة')}${isAtt ? attHdrs : stdHdrs}<th>إجراءات</th></tr>`;
+  if (thead) thead.innerHTML = `<tr>${isAdmin ? '<th style="width:30px"><input type="checkbox" class="custom-checkbox" onchange="toggleAllCB(\''+cbKey+'\',this.checked)"></th>' + thSort('branch','الفرع') : ''}${thSort('empName','الموظف / الوظيفة')}${isAtt ? attHdrs : stdHdrs}<th>إجراءات</th></tr>`;
 
-  if (!list.length) { tbody.innerHTML = '<tr><td colspan="10" style="text-align:center">لا توجد بيانات</td></tr>'; return list; }
+  const colCount = (isAdmin ? 2 : 1) + (isAtt ? 7 : (isShift ? 4 : 5)) + 1;
+  if (!list.length) { tbody.innerHTML = `<tr><td colspan="${colCount}" style="text-align:center">لا توجد بيانات</td></tr>`; return list; }
 
   let html = '';
   const allRows = [];
@@ -860,7 +840,7 @@ function renderList(tableId, dbArray, branchId, dateStartId, dateEndId, statusId
     const visible = _visibleCounts[tableId];
     html = allRows.slice(0, visible).join('');
     if (visible < allRows.length) {
-      html += `<tr><td colspan="12" style="text-align:center;padding:12px"><button class="btn btn-outline btn-sm" onclick="showMoreRows('${tableId}','${tableId.replace('Table','Thead')}','${branchId}','${dateStartId}','${dateEndId}','${statusId}','${nameId}','${posId}',${isAdmin},${isShift})">عرض المزيد (${allRows.length - visible} متبقي)</button> <span style="font-size:10px;color:#888">${visible} / ${allRows.length}</span></td></tr>`;
+      html += `<tr><td colspan="${colCount}" style="text-align:center;padding:12px"><button class="btn btn-outline btn-sm" onclick="showMoreRows('${tableId}','${tableId.replace('Table','Thead')}','${branchId}','${dateStartId}','${dateEndId}','${statusId}','${nameId}','${posId}',${isAdmin},${isShift})">عرض المزيد (${allRows.length - visible} متبقي)</button> <span style="font-size:10px;color:#888">${visible} / ${allRows.length}</span></td></tr>`;
     }
   } else {
     html = allRows.join('');
