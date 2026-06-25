@@ -290,7 +290,10 @@ function enterApp() {
   document.getElementById('userName').textContent = currentRole === 'branch' ? currentBranch.name : (currentRole === 'supervisor' ? 'المشرف' : 'المدير / الموارد البشرية');
   document.getElementById('userRoleLabel').textContent = currentRole === 'branch' ? 'فرع' : (currentRole === 'supervisor' ? 'مشرف اعتماد' : 'إدارة النظام');
   document.getElementById('userAvatar').textContent = currentRole === 'branch' ? '🏢' : (currentRole === 'supervisor' ? '🛡️' : '👑');
+  if (currentRole === 'branch') { NOTIFICATIONS = []; saveNotifications(); }
   populateDynamicSelects(); buildBottomNav(); showPage('pageCalendar');
+  generateNotificationsFromData();
+  refreshNavBadges();
   document.getElementById('bottomNav').style.display = '';
 }
 
@@ -2133,10 +2136,16 @@ function renderNotifications() {
 }
 
 function generateNotificationsFromData() {
+  if (!currentRole) return;
   const today = new Date().toISOString().slice(0, 10);
   loadNotifications();
   const existingTitles = new Set(NOTIFICATIONS.slice(0, 50).map(n => n.title));
-  const todayAtt = DATABASE.attendance.filter(a => a.date === today);
+  let todayAtt = DATABASE.attendance.filter(a => a.date === today);
+  let pendingLeaves = DATABASE.leaves.filter(l => l.status === 'Pending');
+  if (currentRole === 'branch' && currentBranch) {
+    todayAtt = todayAtt.filter(a => String(a.branchId) === String(currentBranch.id));
+    pendingLeaves = pendingLeaves.filter(l => String(l.branchId) === String(currentBranch.id));
+  }
   todayAtt.filter(a => a.delayMin > 0).forEach(a => {
     const title = `تأخير ${a.empName || a.empId} — ${a.delayMin} دقيقة`;
     if (!existingTitles.has(title)) addNotification('delay', title, `يوم ${today}`);
@@ -2145,7 +2154,6 @@ function generateNotificationsFromData() {
     const title = `خروج مبكر ${a.empName || a.empId} — ${a.earlyLeaveMin} دقيقة`;
     if (!existingTitles.has(title)) addNotification('early_leave', title, `يوم ${today}`);
   });
-  const pendingLeaves = DATABASE.leaves.filter(l => l.status === 'Pending');
   if (pendingLeaves.length > 0) {
     const title = `${pendingLeaves.length} إجازات معلقة تحتاج اعتماد`;
     if (!existingTitles.has(title)) addNotification('pending_approval', title, '');
@@ -2270,4 +2278,4 @@ function renderReview() {
 // PWA: فعّلها فقط عند الاستضافة على HTTPS
 // if ('serviceWorker' in navigator) { window.addEventListener('load', () => { navigator.serviceWorker.register('service-worker.js').catch(() => {}); }); });
 loadNotifications();
-fetchCloudData().then(() => { generateNotificationsFromData(); });
+fetchCloudData();
